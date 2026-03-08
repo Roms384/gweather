@@ -1,0 +1,169 @@
+.gweather-menu {
+    border-radius: 12px;
+    padding: 8px;
+    width: 2460px;
+    /* Constrain width */
+    min-height: 200px;
+}
+
+.gweather-container {
+    padding: 10px;
+}
+
+.weather-sunny {
+    color: #ffcc00 !important;
+    /* Vivid Sun Yellow */
+}
+
+.weather-night {
+    color: #cc99ff !important;
+    /* Soft Purple/Blue for Moon */
+}
+
+.weather-cloudy {
+    color: #eeeeee !important;
+    /* Bright White/Silver */
+}
+
+.weather-cloudy-night {
+    color: #a0a0a0 !important;
+    /* Darker Silver for Night Clouds */
+}
+
+.weather-rainy {
+    color: #00ccff !important;
+    /* Bright Sky Blue */
+}
+
+.weather-snowy {
+    color: #ffffff !important;
+    /* Pure White */
+}
+
+.weather-stormy {
+    color: #ff3300 !important;
+    /* Alert Red/Orange */
+}
+
+.gweather-loading-label {
+    font-size: 1.2em;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 60px;
+}
+
+.gweather-tabs {
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.gweather-tab-button {
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-right: 6px;
+    transition: all 0.2s;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    /* Brighter text */
+}
+
+.gweather-tab-button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.gweather-tab-button-active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.gweather-details {
+    padding: 10px;
+    height: 220px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    margin-top: 5px;
+}
+
+.gweather-details-scroll {
+    max-height: 220px;
+}
+
+.gweather-hourly-col {
+    padding: 10px 15px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    min-width: 90px;
+}
+
+.gweather-hourly-col:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.hourly-time {
+    font-weight: bold;
+    color: #ffffff;
+    /* Brighter White */
+}
+
+.hourly-temp {
+    font-size: 1.25em;
+    font-weight: bold;
+    color: #ffffff;
+    /* Brightest white */
+}
+
+.hourly-label {
+    font-size: 0.85em;
+    color: #eeeeee;
+    /* Brighter Light Grey */
+}
+
+.tab-icon {
+    width: 48px;
+    height: 48px;
+    margin: 6px 0;
+}
+
+.detail-icon {
+    width: 32px;
+    height: 32px;
+    margin: 5px auto;
+}
+
+.gweather-temp-max {
+    color: #ffcc00;
+    /* Bright Sun Yellow/Orange */
+    font-weight: bold;
+    font-size: 1.15em;
+}
+
+.gweather-temp-min {
+    color: #55ddff;
+    /* Brighter Sky Blue */
+}
+
+.hourly-wind-box {
+    margin-top: 5px;
+}
+
+.wind-arrow {
+    font-size: 1.2em;
+    color: #ffffff;
+    /* Bright White */
+    font-weight: bold;
+    margin-right: 2px;
+}
+
+.wind-speed {
+    font-size: 0.9em;
+    color: #dddddd;
+    /* Brighter Grey */
+}
+
+.gweather-loading-label {
+    font-size: 1.3em;
+    color: #ffffff;
+    padding: 60px;
+}

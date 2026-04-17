@@ -120,12 +120,27 @@ const WeatherIndicator = GObject.registerClass(
             this._forecastData = null;
 
             // Icon in panel
+            this._panelBox = new St.BoxLayout({
+                style_class: 'panel-status-menu-box',
+                style: 'spacing: 4px;',
+            });
+
             this._icon = new St.Icon({
                 icon_name: 'weather-few-clouds-symbolic',
                 style_class: 'system-status-icon',
+                style: 'padding: 0; margin: 0;',
             });
 
-            this.add_child(this._icon);
+            this._tempLabel = new St.Label({
+                text: '',
+                y_align: Clutter.ActorAlign.CENTER,
+                style: 'padding: 0; margin: 0;',
+            });
+
+            this._panelBox.add_child(this._icon);
+            this._panelBox.add_child(this._tempLabel);
+
+            this.add_child(this._panelBox);
 
             // Build the menu
             try {
@@ -269,7 +284,9 @@ const WeatherIndicator = GObject.registerClass(
                 log(`GWeather: Setting panel icon (idx ${hourlyCurrentIdx})`);
                 const currentCode = this._forecastData.hourly.weather_code[hourlyCurrentIdx];
                 const currentIsDay = this._forecastData.hourly.is_day[hourlyCurrentIdx];
+                const currentTemp = this._forecastData.hourly.temperature_2m[hourlyCurrentIdx].toFixed(1);
                 this._icon.icon_name = getWeatherIcon(currentCode, false, currentIsDay);
+                this._tempLabel.text = `${currentTemp}°`;
 
                 // Update Tabs
                 log(`GWeather: Populating tabs starting from daily idx ${dailyTodayIdx}...`);
@@ -361,7 +378,7 @@ const WeatherIndicator = GObject.registerClass(
                     const timeStr = this._forecastData.hourly.time[i];
                     const hour = timeStr.split('T')[1];
 
-                    const temp = Math.round(this._forecastData.hourly.temperature_2m[i]);
+                    const temp = this._forecastData.hourly.temperature_2m[i].toFixed(1);
                     const code = this._forecastData.hourly.weather_code[i];
                     const isDay = this._forecastData.hourly.is_day[i];
                     const windSpeed = Math.round(this._forecastData.hourly.wind_speed_10m[i]);
@@ -403,18 +420,41 @@ const WeatherIndicator = GObject.registerClass(
                     }));
 
                     // Wind
-                    const windBox = new St.BoxLayout({
-                        style_class: 'hourly-wind-box',
-                        x_align: Clutter.ActorAlign.CENTER
+                    let windClass = 'wind-low';
+                    if (windSpeed >= 20) {
+                        windClass = 'wind-high';
+                    } else if (windSpeed >= 10) {
+                        windClass = 'wind-medium';
+                    }
+
+                    const windBox = new St.Bin({
+                        style_class: `hourly-wind-box ${windClass}`,
+                        x_align: Clutter.ActorAlign.CENTER,
+                        y_align: Clutter.ActorAlign.CENTER,
+                        x_expand: true
                     });
-                    windBox.add_child(new St.Label({
+                    
+                    const innerBox = new St.BoxLayout({
+                        vertical: false,
+                        x_align: Clutter.ActorAlign.CENTER,
+                        y_align: Clutter.ActorAlign.CENTER
+                    });
+
+                    const windArrow = new St.Label({
                         text: `${getWindDirectionArrow(windDeg)}`,
-                        style_class: 'wind-arrow'
-                    }));
-                    windBox.add_child(new St.Label({
+                        style_class: 'wind-arrow',
+                        y_align: Clutter.ActorAlign.CENTER
+                    });
+                    const windSpeedLabel = new St.Label({
                         text: `${windSpeed}`,
-                        style_class: 'wind-speed'
-                    }));
+                        style_class: 'wind-speed',
+                        y_align: Clutter.ActorAlign.CENTER
+                    });
+
+                    innerBox.add_child(windArrow);
+                    innerBox.add_child(windSpeedLabel);
+                    
+                    windBox.set_child(innerBox);
                     col.add_child(windBox);
 
                     hourlyBox.add_child(col);

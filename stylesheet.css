@@ -1,9 +1,17 @@
 .gweather-menu {
     border-radius: 12px;
     padding: 8px;
-    width: 2460px;
-    /* Constrain width */
+    /* Width is set dynamically in extension.js based on monitor resolution */
     min-height: 200px;
+    
+    /* background: linear-gradient(135deg, rgba(30, 10, 80, 0.98) 0%, rgba(10, 10, 60, 0.98) 100%); */
+    /* Fallback for older GNOME Shell versions */
+    background-gradient-direction: vertical;
+    background-gradient-start: rgba(0, 0, 0, 1);
+    background-gradient-end: rgba(0, 0, 64, 1);
+    
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 .gweather-container {
@@ -88,13 +96,25 @@
 .gweather-details {
     padding: 10px;
     height: 220px;
-    background-color: rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, rgba(20, 20, 46, 0.95) 0%, rgba(45, 25, 82, 0.9) 100%);
+    /* Fallback for older GNOME Shell versions */
+    background-gradient-direction: radial;
+    background-gradient-start: rgba(45, 25, 82, 0.9);
+    background-gradient-end: rgba(20, 20, 46, 0.95);
+    
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
     margin-top: 5px;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4);
 }
 
 .gweather-details-scroll {
     max-height: 220px;
+    background-color: transparent !important;
+}
+
+.gweather-details-scroll > StBoxLayout {
+    background-color: transparent !important;
 }
 
 .gweather-hourly-col {

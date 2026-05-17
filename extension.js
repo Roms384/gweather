@@ -115,9 +115,18 @@ const WeatherIndicator = GObject.registerClass(
             super._init(0.0, 'GWeather');
             log('GWeather: Initializing extension...');
 
+            this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.gweather');
             this._weatherService = new WeatherService();
             this._currentDayIndex = 0;
             this._forecastData = null;
+
+            // Auto-refresh when location changes in preferences
+            this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
+                if (key === 'latitude' || key === 'longitude' || key === 'location-name') {
+                    log(`GWeather: Setting '${key}' changed, refreshing...`);
+                    this._refresh().catch(logError);
+                }
+            });
 
             // Icon in panel
             this._panelBox = new St.BoxLayout({
@@ -155,6 +164,14 @@ const WeatherIndicator = GObject.registerClass(
             this.menu.connect('open-state-changed', (menu, isOpen) => {
                 log(`GWeather: Menu open state changed: ${isOpen}`);
                 if (isOpen) {
+                    // Dynamically set menu width based on available work area
+                    const monitorIndex = Main.layoutManager.primaryIndex;
+                    const workArea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
+                    if (workArea) {
+                        menu.box.set_width(workArea.width);
+                        log(`GWeather: Set menu width to ${workArea.width}px (work area excludes dock/panels)`);
+                    }
+
                     this._refresh().catch(logError);
 
                     // Slide-down animation
@@ -230,8 +247,10 @@ const WeatherIndicator = GObject.registerClass(
 
         async _refresh() {
             log('GWeather: Refreshing forecast data...');
-            const lat = 51.5074;
-            const lon = -0.1278;
+            const lat = this._settings.get_double('latitude');
+            const lon = this._settings.get_double('longitude');
+            const locationName = this._settings.get_string('location-name');
+            log(`GWeather: Location: ${locationName} (${lat}, ${lon})`);
 
             try {
                 const data = await this._weatherService.getForecast(lat, lon);
@@ -353,7 +372,6 @@ const WeatherIndicator = GObject.registerClass(
                     vscrollbar_policy: St.PolicyType.NEVER,
                     x_expand: true,
                     y_expand: true,
-                    width: 600, // Constrain width to prevent going off-screen
                     style_class: 'gweather-details-scroll'
                 });
 
@@ -484,6 +502,10 @@ function enable() {
 
 function disable() {
     if (_indicator) {
+        if (_indicator._settingsChangedId) {
+            _indicator._settings.disconnect(_indicator._settingsChangedId);
+            _indicator._settingsChangedId = null;
+        }
         _indicator.destroy();
         _indicator = null;
     }

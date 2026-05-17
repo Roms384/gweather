@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="gweather@antigravity">
+  <schema id="org.gnome.shell.extensions.gweather" path="/org/gnome/shell/extensions/gweather/">
+
+    <key name="location-name" type="s">
+      <default>'London'</default>
+      <summary>Location name</summary>
+      <description>The name of the location to display weather for.</description>
+    </key>
+
+    <key name="latitude" type="d">
+      <default>51.5074</default>
+      <summary>Latitude</summary>
+      <description>The latitude of the location.</description>
+    </key>
+
+    <key name="longitude" type="d">
+      <default>-0.1278</default>
+      <summary>Longitude</summary>
+      <description>The longitude of the location.</description>
+    </key>
+
+  </schema>
+</schemalist>

@@ -2,6 +2,7 @@
     "name": "GWeather",
     "description": "6-Day Forecast Extension with detailed hourly view",
     "uuid": "gweather@antigravity",
+    "settings-schema": "org.gnome.shell.extensions.gweather",
     "shell-version": [
         "42"
     ],

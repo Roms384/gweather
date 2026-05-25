@@ -210,6 +210,61 @@ const WeatherIndicator = GObject.registerClass(
             });
             this._container.add_child(this._loadingLabel);
 
+            // Header Row (location + settings)
+            this._headerRow = new St.BoxLayout({
+                style_class: 'gweather-header',
+                x_expand: true,
+                y_expand: false,
+            });
+
+            const locationName = this._settings.get_string('location-name') || 'Unknown';
+
+            const locationBox = new St.BoxLayout({
+                style_class: 'gweather-location-box',
+                x_expand: true,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
+            const locationIcon = new St.Icon({
+                icon_name: 'find-location-symbolic',
+                style_class: 'gweather-location-icon',
+                icon_size: 14,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
+            this._locationLabel = new St.Label({
+                text: locationName,
+                style_class: 'gweather-location-label',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
+            locationBox.add_child(locationIcon);
+            locationBox.add_child(this._locationLabel);
+
+            const settingsButton = new St.Button({
+                style_class: 'gweather-settings-button',
+                can_focus: true,
+                y_align: Clutter.ActorAlign.CENTER,
+                child: new St.Icon({
+                    icon_name: 'emblem-system-symbolic',
+                    style_class: 'gweather-settings-icon',
+                    icon_size: 16,
+                }),
+            });
+
+            settingsButton.connect('clicked', () => {
+                this.menu.close();
+                ExtensionUtils.openPrefs();
+            });
+
+            this._headerRow.add_child(locationBox);
+            this._headerRow.add_child(settingsButton);
+
+            // Initially hidden (shown after data loads)
+            this._headerRow.hide();
+
+            this._container.add_child(this._headerRow);
+
             // Tabs Row
             this._tabsRow = new St.BoxLayout({
                 style_class: 'gweather-tabs',
@@ -280,8 +335,13 @@ const WeatherIndicator = GObject.registerClass(
 
             try {
                 this._loadingLabel.hide();
+                this._headerRow.show();
                 this._tabsRow.show();
                 this._detailsArea.show();
+
+                // Update location label
+                const locationName = this._settings.get_string('location-name') || 'Unknown';
+                this._locationLabel.text = locationName;
 
                 // Current day/time for index sync
                 const now = new Date();

@@ -11,11 +11,51 @@
     background-gradient-end: rgba(0, 0, 64, 1);
 
     border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 .gweather-container {
     padding: 10px;
+}
+
+.gweather-header {
+    padding: 4px 8px 10px 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gweather-location-box {
+    spacing: 6px;
+}
+
+.gweather-location-icon {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.gweather-location-label {
+    font-size: 1em;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.gweather-settings-button {
+    border-radius: 20px;
+    padding: 6px;
+    border: 1px solid transparent;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.gweather-settings-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.gweather-settings-button:active {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.gweather-settings-icon {
+    color: inherit;
 }
 
 .weather-sunny {

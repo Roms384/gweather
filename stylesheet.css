@@ -37,6 +37,12 @@
     color: rgba(255, 255, 255, 0.85);
 }
 
+.gweather-humidity-label {
+    font-size: 0.9em;
+    color: rgba(120, 180, 255, 0.85);
+    margin-left: 10px;
+}
+
 .gweather-settings-button {
     border-radius: 20px;
     padding: 6px;

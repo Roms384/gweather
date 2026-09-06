@@ -68,7 +68,7 @@ class WeatherService {
     }
 
     async getForecast(lat, lon) {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&past_days=1`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=relative_humidity_2m&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&past_days=1`;
 
         log(`GWeather: Fetching from ${url}`);
 
@@ -161,6 +161,13 @@ const WeatherIndicator = GObject.registerClass(
             // Initial update
             this._refresh().catch(logError);
 
+            // Auto-refresh every 5 minutes (300 seconds)
+            this._refreshTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 300, () => {
+                log('GWeather: Auto-refresh triggered');
+                this._refresh().catch(logError);
+                return GLib.SOURCE_CONTINUE;
+            });
+
             this.menu.connect('open-state-changed', (menu, isOpen) => {
                 log(`GWeather: Menu open state changed: ${isOpen}`);
                 if (isOpen) {
@@ -238,8 +245,15 @@ const WeatherIndicator = GObject.registerClass(
                 y_align: Clutter.ActorAlign.CENTER,
             });
 
+            this._humidityLabel = new St.Label({
+                text: '',
+                style_class: 'gweather-humidity-label',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
             locationBox.add_child(locationIcon);
             locationBox.add_child(this._locationLabel);
+            locationBox.add_child(this._humidityLabel);
 
             const settingsButton = new St.Button({
                 style_class: 'gweather-settings-button',
@@ -366,6 +380,13 @@ const WeatherIndicator = GObject.registerClass(
                 const currentTemp = this._forecastData.hourly.temperature_2m[hourlyCurrentIdx].toFixed(1);
                 this._icon.icon_name = getWeatherIcon(currentCode, false, currentIsDay);
                 this._tempLabel.text = `${currentTemp}°`;
+
+                // Use the 'current' field for real-time humidity (updated every 15 min)
+                if (this._forecastData.current && this._forecastData.current.relative_humidity_2m != null) {
+                    this._humidityLabel.text = `💧 ${this._forecastData.current.relative_humidity_2m}%`;
+                } else {
+                    this._humidityLabel.text = '';
+                }
 
                 // Update Tabs
                 log(`GWeather: Populating tabs starting from daily idx ${dailyTodayIdx}...`);
@@ -547,6 +568,18 @@ const WeatherIndicator = GObject.registerClass(
                 throw e; // Rethrow so _refresh catch block can catch it
             }
         }
+
+        destroy() {
+            if (this._refreshTimerId) {
+                GLib.source_remove(this._refreshTimerId);
+                this._refreshTimerId = null;
+            }
+            if (this._settingsChangedId) {
+                this._settings.disconnect(this._settingsChangedId);
+                this._settingsChangedId = null;
+            }
+            super.destroy();
+        }
     });
 
 let _indicator;
@@ -562,10 +595,6 @@ function enable() {
 
 function disable() {
     if (_indicator) {
-        if (_indicator._settingsChangedId) {
-            _indicator._settings.disconnect(_indicator._settingsChangedId);
-            _indicator._settingsChangedId = null;
-        }
         _indicator.destroy();
         _indicator = null;
     }

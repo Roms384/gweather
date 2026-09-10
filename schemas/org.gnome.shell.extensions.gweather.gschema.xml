@@ -20,5 +20,29 @@
       <description>The longitude of the location.</description>
     </key>
 
+    <key name="weather-provider" type="s">
+      <default>'open-meteo'</default>
+      <summary>Weather provider</summary>
+      <description>The weather forecast data provider.</description>
+    </key>
+
+    <key name="api-key-weatherapi" type="s">
+      <default>''</default>
+      <summary>WeatherAPI.com API Key</summary>
+      <description>API key for WeatherAPI.com service.</description>
+    </key>
+
+    <key name="api-key-openweathermap" type="s">
+      <default>''</default>
+      <summary>OpenWeatherMap API Key</summary>
+      <description>API key for OpenWeatherMap service.</description>
+    </key>
+
+    <key name="api-key-pirateweather" type="s">
+      <default>''</default>
+      <summary>Pirate Weather API Key</summary>
+      <description>API key for Pirate Weather service.</description>
+    </key>
+
   </schema>
 </schemalist>

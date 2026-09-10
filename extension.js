@@ -4,6 +4,7 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
+const { getWeatherProvider } = Me.imports.providers.index;
 
 const WEATHER_CODE_MAP = {
     0: { label: 'Clear sky', icon: 'weather-clear-symbolic', fullIcon: 'weather-clear', nightIcon: 'weather-clear-night-symbolic', nightFullIcon: 'weather-clear-night' },
@@ -59,56 +60,6 @@ function getWindDirectionArrow(deg) {
     return arrows[index];
 }
 
-// Basic Weather Service using Open-Meteo
-class WeatherService {
-    constructor() {
-        this._httpSession = new Soup.Session();
-        this._isSoup3 = Soup.get_major_version?.() === 3 || this._httpSession.send_and_read_async;
-        log(`GWeather: Using Soup version ${this._isSoup3 ? '3.0' : '2.4'}`);
-    }
-
-    async getForecast(lat, lon) {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=relative_humidity_2m&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&past_days=1`;
-
-        log(`GWeather: Fetching from ${url}`);
-
-        if (this._isSoup3) {
-            // Soup 3.0
-            try {
-                const message = Soup.Message.new('GET', url);
-                const bytes = await this._httpSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null);
-                const decoder = new TextDecoder('utf-8');
-                const data = JSON.parse(decoder.decode(bytes.get_data()));
-                return data;
-            } catch (e) {
-                log(`GWeather: Soup 3.0 Error: ${e.message}`);
-                logError(e);
-                return null;
-            }
-        } else {
-            // Soup 2.4
-            const message = Soup.Message.new('GET', url);
-            return new Promise((resolve) => {
-                this._httpSession.queue_message(message, (session, msg) => {
-                    if (msg.status_code !== 200) {
-                        log(`GWeather: Soup 2.4 Error - Status: ${msg.status_code}, Reason: ${msg.reason_phrase}`);
-                        resolve(null);
-                        return;
-                    }
-                    try {
-                        const data = JSON.parse(msg.response_body.data);
-                        resolve(data);
-                    } catch (e) {
-                        log(`GWeather: Soup 2.4 Parse Error: ${e.message}`);
-                        logError(e);
-                        resolve(null);
-                    }
-                });
-            });
-        }
-    }
-}
-
 const WeatherIndicator = GObject.registerClass(
     class WeatherIndicator extends PanelMenu.Button {
         _init() {
@@ -116,13 +67,21 @@ const WeatherIndicator = GObject.registerClass(
             log('GWeather: Initializing extension...');
 
             this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.gweather');
-            this._weatherService = new WeatherService();
             this._currentDayIndex = 0;
             this._forecastData = null;
 
-            // Auto-refresh when location changes in preferences
+            // Auto-refresh when location or provider settings change in preferences
             this._settingsChangedId = this._settings.connect('changed', (settings, key) => {
-                if (key === 'latitude' || key === 'longitude' || key === 'location-name') {
+                const monitoredKeys = [
+                    'latitude',
+                    'longitude',
+                    'location-name',
+                    'weather-provider',
+                    'api-key-weatherapi',
+                    'api-key-openweathermap',
+                    'api-key-pirateweather',
+                ];
+                if (monitoredKeys.includes(key)) {
                     log(`GWeather: Setting '${key}' changed, refreshing...`);
                     this._refresh().catch(logError);
                 }
@@ -255,6 +214,29 @@ const WeatherIndicator = GObject.registerClass(
             locationBox.add_child(this._locationLabel);
             locationBox.add_child(this._humidityLabel);
 
+            const rightBox = new St.BoxLayout({
+                style_class: 'gweather-header-right',
+                style: 'spacing: 8px;',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
+            this._providerLabel = new St.Label({
+                text: '',
+                style_class: 'gweather-provider-label',
+                y_align: Clutter.ActorAlign.CENTER,
+                reactive: true,
+                track_hover: true,
+            });
+
+            const initialProvider = getWeatherProvider(this._settings);
+            this._providerLabel.text = initialProvider.name;
+
+            this._providerLabel.connect('button-press-event', () => {
+                this.menu.close();
+                ExtensionUtils.openPrefs();
+                return Clutter.EVENT_STOP;
+            });
+
             const settingsButton = new St.Button({
                 style_class: 'gweather-settings-button',
                 can_focus: true,
@@ -271,8 +253,11 @@ const WeatherIndicator = GObject.registerClass(
                 ExtensionUtils.openPrefs();
             });
 
+            rightBox.add_child(this._providerLabel);
+            rightBox.add_child(settingsButton);
+
             this._headerRow.add_child(locationBox);
-            this._headerRow.add_child(settingsButton);
+            this._headerRow.add_child(rightBox);
 
             // Initially hidden (shown after data loads)
             this._headerRow.hide();
@@ -322,25 +307,30 @@ const WeatherIndicator = GObject.registerClass(
             log(`GWeather: Location: ${locationName} (${lat}, ${lon})`);
 
             try {
-                const data = await this._weatherService.getForecast(lat, lon);
-                if (data) {
+                const provider = getWeatherProvider(this._settings);
+                log(`GWeather: Using provider '${provider.name}'`);
+                if (this._providerLabel) {
+                    this._providerLabel.text = provider.name;
+                }
+                const data = await provider.getForecast(lat, lon);
+                if (data && data.daily && data.daily.length > 0) {
                     log('GWeather: Data successfully received');
                     this._forecastData = data;
                     this._updateUI();
                 } else {
-                    log('GWeather: Data fetch returned null');
+                    log('GWeather: Data fetch returned empty/invalid forecast');
                     this._loadingLabel.text = 'Failed to load weather data';
                     this._loadingLabel.show();
                 }
             } catch (e) {
                 logError(e);
-                this._loadingLabel.text = 'Error fetching data';
+                this._loadingLabel.text = e.message || 'Error fetching data';
                 this._loadingLabel.show();
             }
         }
 
         _updateUI() {
-            if (!this._forecastData) {
+            if (!this._forecastData || !this._forecastData.daily) {
                 log('GWeather: No data to display in UI');
                 return;
             }
@@ -357,82 +347,48 @@ const WeatherIndicator = GObject.registerClass(
                 const locationName = this._settings.get_string('location-name') || 'Unknown';
                 this._locationLabel.text = locationName;
 
-                // Current day/time for index sync
-                const now = new Date();
-                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const currentHour = now.getHours();
-                const currentHourStr = `${todayStr}T${String(currentHour).padStart(2, '0')}:00`;
+                // Update provider label
+                const provider = getWeatherProvider(this._settings);
+                if (this._providerLabel) {
+                    this._providerLabel.text = provider.name;
+                }
 
-                // Find indices dynamically
-                let hourlyCurrentIdx = this._forecastData.hourly.time.indexOf(currentHourStr);
-                if (hourlyCurrentIdx === -1) hourlyCurrentIdx = 24 + currentHour; // fallback
+                const { current, daily } = this._forecastData;
 
-                let dailyTodayIdx = this._forecastData.daily.time.indexOf(todayStr);
-                if (dailyTodayIdx === -1) dailyTodayIdx = 1; // fallback
+                // Update Panel Icon & Temperature
+                log(`GWeather: Setting panel icon and temp (${current.temp}°)`);
+                this._icon.icon_name = getWeatherIcon(current.weatherCode, false, current.isDay);
+                this._tempLabel.text = `${current.temp.toFixed(1)}°`;
 
-                // Find start of today in hourly data for offsets
-                const hourlyTodayStartIdx = this._forecastData.hourly.time.indexOf(`${todayStr}T00:00`);
-
-                // Update Panel Icon
-                log(`GWeather: Setting panel icon (idx ${hourlyCurrentIdx})`);
-                const currentCode = this._forecastData.hourly.weather_code[hourlyCurrentIdx];
-                const currentIsDay = this._forecastData.hourly.is_day[hourlyCurrentIdx];
-                const currentTemp = this._forecastData.hourly.temperature_2m[hourlyCurrentIdx].toFixed(1);
-                this._icon.icon_name = getWeatherIcon(currentCode, false, currentIsDay);
-                this._tempLabel.text = `${currentTemp}°`;
-
-                // Use the 'current' field for real-time humidity (updated every 15 min)
-                if (this._forecastData.current && this._forecastData.current.relative_humidity_2m != null) {
-                    this._humidityLabel.text = `💧 ${this._forecastData.current.relative_humidity_2m}%`;
+                // Update humidity label
+                if (current.humidity != null) {
+                    this._humidityLabel.text = `💧 ${current.humidity}%`;
                 } else {
                     this._humidityLabel.text = '';
                 }
 
                 // Update Tabs
-                log(`GWeather: Populating tabs starting from daily idx ${dailyTodayIdx}...`);
+                log('GWeather: Populating tabs...');
                 this._tabsRow.destroy_all_children();
-                for (let i = 0; i < 6; i++) {
-                    const dataIdx = dailyTodayIdx + i;
-                    const dateStr = this._forecastData.daily.time[dataIdx];
-                    if (!dateStr) continue;
 
-                    const parts = dateStr.split('-');
-                    const date = new Date(parts[0], parts[1] - 1, parts[2]);
-
-                    const dayName = i === 0 ? 'Today' : date.toLocaleDateString(undefined, { weekday: 'short' });
-                    const tempMax = Math.round(this._forecastData.daily.temperature_2m_max[dataIdx]);
-
-                    // Calculate representative code for the tab
-                    let code;
-                    if (i === 0) {
-                        code = currentCode; // Today matches current conditions
-                    } else {
-                        // For future days, find the most common weather code between 08:00 and 20:00
-                        const dayStartIdx = (hourlyTodayStartIdx === -1 ? 24 : hourlyTodayStartIdx) + (i * 24);
-                        const dayEndIdx = dayStartIdx + 24;
-                        const dayCodes = this._forecastData.hourly.weather_code.slice(dayStartIdx + 8, dayStartIdx + 20); // Focus on daylight hours
-
-                        const counts = {};
-                        dayCodes.forEach(c => counts[c] = (counts[c] || 0) + 1);
-                        code = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-                        code = parseInt(code);
-                    }
-
+                for (let i = 0; i < daily.length; i++) {
+                    const day = daily[i];
                     const tabBox = new St.BoxLayout({ vertical: true });
-                    tabBox.add_child(new St.Label({ text: dayName, x_align: Clutter.ActorAlign.CENTER }));
-                    const iconClass = `tab-icon ${getWeatherClass(code)}`;
+                    tabBox.add_child(new St.Label({ text: day.dayName, x_align: Clutter.ActorAlign.CENTER }));
+
+                    const iconClass = `tab-icon ${getWeatherClass(day.weatherCode)}`;
                     tabBox.add_child(new St.Icon({
-                        icon_name: getWeatherIcon(code, true),
+                        icon_name: getWeatherIcon(day.weatherCode, true),
                         style_class: iconClass,
-                        icon_size: 48
+                        icon_size: 48,
                     }));
-                    tabBox.add_child(new St.Label({ text: `${tempMax}°`, style_class: 'gweather-temp-max', x_align: Clutter.ActorAlign.CENTER }));
+                    tabBox.add_child(new St.Label({ text: `${day.tempMax}°`, style_class: 'gweather-temp-max', x_align: Clutter.ActorAlign.CENTER }));
 
                     const tab = new St.Button({
                         style_class: i === this._currentDayIndex ? 'gweather-tab-button gweather-tab-button-active' : 'gweather-tab-button',
                         can_focus: true,
                         x_expand: true,
-                        child: tabBox
+                        child: tabBox,
                     });
 
                     tab.connect('clicked', () => {
@@ -453,36 +409,19 @@ const WeatherIndicator = GObject.registerClass(
                     vscrollbar_policy: St.PolicyType.NEVER,
                     x_expand: true,
                     y_expand: true,
-                    style_class: 'gweather-details-scroll'
+                    style_class: 'gweather-details-scroll',
                 });
 
                 const hourlyBox = new St.BoxLayout({
                     vertical: false,
                     x_expand: true,
-                    y_expand: true
+                    y_expand: true,
                 });
 
-                // Find start of selected day in hourly data
-                let startIdx = (hourlyTodayStartIdx === -1 ? 24 : hourlyTodayStartIdx) + (this._currentDayIndex * 24);
+                const selectedDay = daily[this._currentDayIndex] || daily[0];
+                const hourlyItems = selectedDay?.hourly || [];
 
-                if (this._currentDayIndex === 0) {
-                    // Today starts 3 hours before current time
-                    startIdx = Math.max(0, hourlyCurrentIdx - 3);
-                }
-
-                log(`GWeather: Populating hourly items (horizontal) from index ${startIdx}`);
-                for (let i = startIdx; i < startIdx + 24; i++) {
-                    if (i >= this._forecastData.hourly.time.length) break;
-
-                    const timeStr = this._forecastData.hourly.time[i];
-                    const hour = timeStr.split('T')[1];
-
-                    const temp = this._forecastData.hourly.temperature_2m[i].toFixed(1);
-                    const code = this._forecastData.hourly.weather_code[i];
-                    const isDay = this._forecastData.hourly.is_day[i];
-                    const windSpeed = Math.round(this._forecastData.hourly.wind_speed_10m[i]);
-                    const windDeg = this._forecastData.hourly.wind_direction_10m[i];
-
+                for (const item of hourlyItems) {
                     const col = new St.BoxLayout({
                         vertical: true,
                         style_class: 'gweather-hourly-col',
@@ -490,39 +429,39 @@ const WeatherIndicator = GObject.registerClass(
 
                     // Hour
                     col.add_child(new St.Label({
-                        text: hour,
+                        text: item.hour,
                         style_class: 'hourly-time',
-                        x_align: Clutter.ActorAlign.CENTER
+                        x_align: Clutter.ActorAlign.CENTER,
                     }));
 
                     // Icon
-                    const iconClass = `detail-icon ${getWeatherClass(code, isDay)}`;
+                    const iconClass = `detail-icon ${getWeatherClass(item.weatherCode, item.isDay)}`;
                     col.add_child(new St.Icon({
-                        icon_name: getWeatherIcon(code, true, isDay),
+                        icon_name: getWeatherIcon(item.weatherCode, true, item.isDay),
                         style_class: iconClass,
                         icon_size: 32,
-                        x_align: Clutter.ActorAlign.CENTER
+                        x_align: Clutter.ActorAlign.CENTER,
                     }));
 
                     // Temp
                     col.add_child(new St.Label({
-                        text: `${temp}°`,
+                        text: `${item.temp.toFixed(1)}°`,
                         style_class: 'hourly-temp',
-                        x_align: Clutter.ActorAlign.CENTER
+                        x_align: Clutter.ActorAlign.CENTER,
                     }));
 
                     // Summary
                     col.add_child(new St.Label({
-                        text: getWeatherLabel(code),
+                        text: getWeatherLabel(item.weatherCode),
                         style_class: 'hourly-label',
-                        x_align: Clutter.ActorAlign.CENTER
+                        x_align: Clutter.ActorAlign.CENTER,
                     }));
 
                     // Wind
                     let windClass = 'wind-low';
-                    if (windSpeed >= 20) {
+                    if (item.windSpeed >= 20) {
                         windClass = 'wind-high';
-                    } else if (windSpeed >= 10) {
+                    } else if (item.windSpeed >= 10) {
                         windClass = 'wind-medium';
                     }
 
@@ -530,29 +469,29 @@ const WeatherIndicator = GObject.registerClass(
                         style_class: `hourly-wind-box ${windClass}`,
                         x_align: Clutter.ActorAlign.CENTER,
                         y_align: Clutter.ActorAlign.CENTER,
-                        x_expand: true
+                        x_expand: true,
                     });
-                    
+
                     const innerBox = new St.BoxLayout({
                         vertical: false,
                         x_align: Clutter.ActorAlign.CENTER,
-                        y_align: Clutter.ActorAlign.CENTER
+                        y_align: Clutter.ActorAlign.CENTER,
                     });
 
                     const windArrow = new St.Label({
-                        text: `${getWindDirectionArrow(windDeg)}`,
+                        text: `${getWindDirectionArrow(item.windDirection)}`,
                         style_class: 'wind-arrow',
-                        y_align: Clutter.ActorAlign.CENTER
+                        y_align: Clutter.ActorAlign.CENTER,
                     });
                     const windSpeedLabel = new St.Label({
-                        text: `${windSpeed}`,
+                        text: `${item.windSpeed}`,
                         style_class: 'wind-speed',
-                        y_align: Clutter.ActorAlign.CENTER
+                        y_align: Clutter.ActorAlign.CENTER,
                     });
 
                     innerBox.add_child(windArrow);
                     innerBox.add_child(windSpeedLabel);
-                    
+
                     windBox.set_child(innerBox);
                     col.add_child(windBox);
 

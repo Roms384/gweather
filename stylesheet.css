@@ -43,6 +43,20 @@
     margin-left: 10px;
 }
 
+.gweather-header-right {
+    spacing: 8px;
+}
+
+.gweather-provider-label {
+    font-size: 1em;
+    color: rgba(255, 255, 255, 0.5);
+    margin-right: 4px;
+}
+
+.gweather-provider-label:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .gweather-settings-button {
     border-radius: 20px;
     padding: 6px;

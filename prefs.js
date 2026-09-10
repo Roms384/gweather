@@ -2,6 +2,8 @@
 
 const { Adw, Gtk, Gio, GLib, Soup } = imports.gi;
 const ExtensionUtils = imports.misc.extensionUtils;
+const Me = ExtensionUtils.getCurrentExtension();
+const { PROVIDERS_META } = Me.imports.providers.index;
 
 function init() {
     // Nothing to do here
@@ -145,6 +147,119 @@ function fillPreferencesWindow(window) {
 
     searchButton.connect('clicked', doSearch);
     searchEntry.connect('activate', doSearch);
+
+    // ── Provider Page ─────────────────────────────────────────────
+    const providerPage = new Adw.PreferencesPage({
+        title: 'Provider',
+        icon_name: 'weather-few-clouds-symbolic',
+    });
+    window.add(providerPage);
+
+    // Provider Selection Group
+    const providerGroup = new Adw.PreferencesGroup({
+        title: 'Weather Service',
+        description: 'Choose which service supplies forecast and current conditions',
+    });
+    providerPage.add(providerGroup);
+
+    const providerNames = PROVIDERS_META.map(p => p.name);
+    const providerModel = Gtk.StringList.new(providerNames);
+
+    const currentProviderId = settings.get_string('weather-provider') || 'open-meteo';
+    let initialIndex = PROVIDERS_META.findIndex(p => p.id === currentProviderId);
+    if (initialIndex === -1) initialIndex = 0;
+
+    const providerRow = new Adw.ComboRow({
+        title: 'Data Provider',
+        subtitle: PROVIDERS_META[initialIndex].description,
+        model: providerModel,
+        selected: initialIndex,
+    });
+    providerGroup.add(providerRow);
+
+    // API Keys Group
+    const apiKeysGroup = new Adw.PreferencesGroup({
+        title: 'API Credentials',
+        description: 'Configure API keys for third-party weather services',
+    });
+    providerPage.add(apiKeysGroup);
+
+    // Info row for keyless providers
+    const keylessInfoRow = new Adw.ActionRow({
+        title: 'No API Key Required',
+        subtitle: 'This provider is completely free and requires no configuration',
+    });
+    keylessInfoRow.add_prefix(new Gtk.Image({
+        icon_name: 'emblem-default-symbolic',
+        pixel_size: 20,
+    }));
+    apiKeysGroup.add(keylessInfoRow);
+
+    // Map of key rows
+    const keyRows = {};
+
+    for (const p of PROVIDERS_META) {
+        if (!p.requiresKey) continue;
+
+        const row = new Adw.ActionRow({
+            title: `${p.name} Key`,
+            subtitle: 'Enter your personal API key',
+        });
+
+        const entry = new Gtk.PasswordEntry({
+            text: settings.get_string(p.keySetting) || '',
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+            show_peek_icon: true,
+        });
+
+        entry.connect('changed', () => {
+            settings.set_string(p.keySetting, entry.get_text().trim());
+        });
+
+        row.add_suffix(entry);
+
+        if (p.keyUrl) {
+            const linkButton = new Gtk.LinkButton({
+                uri: p.keyUrl,
+                label: 'Get Key',
+                valign: Gtk.Align.CENTER,
+            });
+            row.add_suffix(linkButton);
+        }
+
+        apiKeysGroup.add(row);
+        keyRows[p.id] = row;
+    }
+
+    function updateKeyVisibility(selectedIdx) {
+        const selectedProvider = PROVIDERS_META[selectedIdx];
+        providerRow.set_subtitle(selectedProvider.description);
+
+        if (selectedProvider.requiresKey) {
+            keylessInfoRow.set_visible(false);
+            for (const [id, row] of Object.entries(keyRows)) {
+                row.set_visible(id === selectedProvider.id);
+            }
+        } else {
+            keylessInfoRow.set_visible(true);
+            keylessInfoRow.set_subtitle(`${selectedProvider.name} is free to use and requires no API key`);
+            for (const row of Object.values(keyRows)) {
+                row.set_visible(false);
+            }
+        }
+    }
+
+    updateKeyVisibility(initialIndex);
+
+    providerRow.connect('notify::selected', () => {
+        const idx = providerRow.selected;
+        if (idx >= 0 && idx < PROVIDERS_META.length) {
+            const newProvider = PROVIDERS_META[idx];
+            settings.set_string('weather-provider', newProvider.id);
+            updateKeyVisibility(idx);
+        }
+    });
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

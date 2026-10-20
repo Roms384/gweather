@@ -4,7 +4,7 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
-const { getWeatherProvider } = Me.imports.providers.index;
+const { getWeatherProvider, PROVIDERS_META } = Me.imports.providers.index;
 
 const WEATHER_CODE_MAP = {
     0: { label: 'Clear sky', icon: 'weather-clear-symbolic', fullIcon: 'weather-clear', nightIcon: 'weather-clear-night-symbolic', nightFullIcon: 'weather-clear-night' },
@@ -150,6 +150,8 @@ const WeatherIndicator = GObject.registerClass(
                         duration: 500,
                         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     });
+                } else {
+                    this._closeProviderDropdown();
                 }
             });
         }
@@ -220,21 +222,41 @@ const WeatherIndicator = GObject.registerClass(
                 y_align: Clutter.ActorAlign.CENTER,
             });
 
+            // Provider Dropdown Button
+            const initialProvider = getWeatherProvider(this._settings);
+
+            const dropdownBtnBox = new St.BoxLayout({
+                style_class: 'gweather-dropdown-button-box',
+                style: 'spacing: 6px;',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
             this._providerLabel = new St.Label({
-                text: '',
+                text: initialProvider.name,
                 style_class: 'gweather-provider-label',
                 y_align: Clutter.ActorAlign.CENTER,
-                reactive: true,
+            });
+
+            this._providerArrow = new St.Icon({
+                icon_name: 'pan-down-symbolic',
+                style_class: 'gweather-dropdown-arrow',
+                icon_size: 12,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+
+            dropdownBtnBox.add_child(this._providerLabel);
+            dropdownBtnBox.add_child(this._providerArrow);
+
+            this._providerButton = new St.Button({
+                style_class: 'gweather-dropdown-button',
+                can_focus: true,
+                y_align: Clutter.ActorAlign.CENTER,
+                child: dropdownBtnBox,
                 track_hover: true,
             });
 
-            const initialProvider = getWeatherProvider(this._settings);
-            this._providerLabel.text = initialProvider.name;
-
-            this._providerLabel.connect('button-press-event', () => {
-                this.menu.close();
-                ExtensionUtils.openPrefs();
-                return Clutter.EVENT_STOP;
+            this._providerButton.connect('clicked', () => {
+                this._toggleProviderDropdown();
             });
 
             const settingsButton = new St.Button({
@@ -249,11 +271,12 @@ const WeatherIndicator = GObject.registerClass(
             });
 
             settingsButton.connect('clicked', () => {
+                this._closeProviderDropdown();
                 this.menu.close();
                 ExtensionUtils.openPrefs();
             });
 
-            rightBox.add_child(this._providerLabel);
+            rightBox.add_child(this._providerButton);
             rightBox.add_child(settingsButton);
 
             this._headerRow.add_child(locationBox);
@@ -263,6 +286,27 @@ const WeatherIndicator = GObject.registerClass(
             this._headerRow.hide();
 
             this._container.add_child(this._headerRow);
+
+            // Dropdown Menu Container (placed under header row, right-aligned)
+            this._dropdownRow = new St.BoxLayout({
+                style_class: 'gweather-dropdown-row',
+                x_expand: true,
+                y_expand: false,
+            });
+
+            const dropdownSpacer = new St.Bin({ x_expand: true });
+
+            this._dropdownMenu = new St.BoxLayout({
+                vertical: true,
+                style_class: 'gweather-dropdown-menu',
+            });
+
+            this._dropdownRow.add_child(dropdownSpacer);
+            this._dropdownRow.add_child(this._dropdownMenu);
+            this._dropdownRow.hide();
+            this._isProviderDropdownOpen = false;
+
+            this._container.add_child(this._dropdownRow);
 
             // Tabs Row
             this._tabsRow = new St.BoxLayout({
@@ -277,6 +321,11 @@ const WeatherIndicator = GObject.registerClass(
                 style_class: 'gweather-details',
                 x_expand: true,
                 y_expand: true,
+            });
+
+            this._detailsArea.connect('button-press-event', () => {
+                this._closeProviderDropdown();
+                return Clutter.EVENT_PROPAGATE;
             });
 
             // Initially hidden
@@ -297,6 +346,130 @@ const WeatherIndicator = GObject.registerClass(
 
             this.menu.addMenuItem(menuItem);
             log('GWeather: Menu built');
+        }
+
+        _toggleProviderDropdown() {
+            if (this._isProviderDropdownOpen) {
+                this._closeProviderDropdown();
+            } else {
+                this._openProviderDropdown();
+            }
+        }
+
+        _openProviderDropdown() {
+            if (this._isProviderDropdownOpen) return;
+            this._isProviderDropdownOpen = true;
+            this._updateDropdownItems();
+            this._providerArrow.icon_name = 'pan-up-symbolic';
+            this._providerButton.add_style_pseudo_class('active');
+            this._providerButton.add_style_class_name('open');
+            this._dropdownRow.opacity = 0;
+            this._dropdownRow.show();
+            this._dropdownRow.ease({
+                opacity: 255,
+                duration: 150,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
+
+        _closeProviderDropdown() {
+            if (!this._isProviderDropdownOpen) return;
+            this._isProviderDropdownOpen = false;
+            if (this._providerArrow) {
+                this._providerArrow.icon_name = 'pan-down-symbolic';
+            }
+            if (this._providerButton) {
+                this._providerButton.remove_style_pseudo_class('active');
+                this._providerButton.remove_style_class_name('open');
+            }
+            if (this._dropdownRow) {
+                this._dropdownRow.hide();
+            }
+        }
+
+        _updateDropdownItems() {
+            this._dropdownMenu.destroy_all_children();
+
+            const currentProviderId = this._settings.get_string('weather-provider') || 'open-meteo';
+
+            for (const p of PROVIDERS_META) {
+                const isCurrent = (p.id === currentProviderId);
+
+                const itemBox = new St.BoxLayout({
+                    vertical: false,
+                    style_class: 'gweather-dropdown-item-box',
+                    style: 'spacing: 8px;',
+                    y_align: Clutter.ActorAlign.CENTER,
+                    x_expand: true,
+                });
+
+                const checkIcon = new St.Icon({
+                    icon_name: 'emblem-ok-symbolic',
+                    style_class: 'gweather-dropdown-item-check',
+                    icon_size: 14,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    opacity: isCurrent ? 255 : 0,
+                });
+
+                const nameLabel = new St.Label({
+                    text: p.name,
+                    style_class: 'gweather-dropdown-item-name',
+                    x_expand: true,
+                    y_align: Clutter.ActorAlign.CENTER,
+                });
+
+                itemBox.add_child(checkIcon);
+                itemBox.add_child(nameLabel);
+
+                let badgeText = 'Free';
+                let badgeClass = 'free';
+
+                if (p.requiresKey) {
+                    const hasKey = !!this._settings.get_string(p.keySetting)?.trim();
+                    if (hasKey) {
+                        badgeText = 'Key set';
+                        badgeClass = 'configured';
+                    } else {
+                        badgeText = 'Key needed';
+                        badgeClass = 'missing';
+                    }
+                }
+
+                const badgeLabel = new St.Label({
+                    text: badgeText,
+                    style_class: `gweather-dropdown-badge ${badgeClass}`,
+                    y_align: Clutter.ActorAlign.CENTER,
+                });
+                itemBox.add_child(badgeLabel);
+
+                const itemBtn = new St.Button({
+                    style_class: isCurrent ? 'gweather-dropdown-item active' : 'gweather-dropdown-item',
+                    can_focus: true,
+                    x_expand: true,
+                    track_hover: true,
+                    child: itemBox,
+                });
+
+                itemBtn.connect('clicked', () => {
+                    this._selectProvider(p.id);
+                });
+
+                this._dropdownMenu.add_child(itemBtn);
+            }
+        }
+
+        _selectProvider(providerId) {
+            this._closeProviderDropdown();
+            const currentProviderId = this._settings.get_string('weather-provider') || 'open-meteo';
+            if (providerId === currentProviderId) {
+                return;
+            }
+            const meta = PROVIDERS_META.find(p => p.id === providerId);
+            if (meta && this._providerLabel) {
+                this._providerLabel.text = meta.name;
+            }
+            log(`GWeather: Switching provider to '${providerId}'`);
+            this._settings.set_string('weather-provider', providerId);
         }
 
         async _refresh() {
@@ -321,11 +494,13 @@ const WeatherIndicator = GObject.registerClass(
                     log('GWeather: Data fetch returned empty/invalid forecast');
                     this._loadingLabel.text = 'Failed to load weather data';
                     this._loadingLabel.show();
+                    this._headerRow.show();
                 }
             } catch (e) {
                 logError(e);
                 this._loadingLabel.text = e.message || 'Error fetching data';
                 this._loadingLabel.show();
+                this._headerRow.show();
             }
         }
 
@@ -338,6 +513,7 @@ const WeatherIndicator = GObject.registerClass(
             log('GWeather: Starting UI update...');
 
             try {
+                this._closeProviderDropdown();
                 this._loadingLabel.hide();
                 this._headerRow.show();
                 this._tabsRow.show();
@@ -392,6 +568,7 @@ const WeatherIndicator = GObject.registerClass(
                     });
 
                     tab.connect('clicked', () => {
+                        this._closeProviderDropdown();
                         log(`GWeather: Tab ${i} clicked`);
                         this._currentDayIndex = i;
                         this._updateUI();

@@ -47,14 +47,117 @@
     spacing: 8px;
 }
 
+.gweather-dropdown-button {
+    border-radius: 8px;
+    padding: 4px 10px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.gweather-dropdown-button:hover,
+.gweather-dropdown-button:focus {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+}
+
+.gweather-dropdown-button:active,
+.gweather-dropdown-button.open {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+}
+
+.gweather-dropdown-button-box {
+    spacing: 6px;
+}
+
 .gweather-provider-label {
-    font-size: 1em;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.95em;
+    font-weight: 500;
+    color: inherit;
     margin-right: 4px;
 }
 
-.gweather-provider-label:hover {
+.gweather-dropdown-arrow {
+    color: inherit;
+    opacity: 0.75;
+}
+
+.gweather-dropdown-row {
+    padding: 0 8px;
+    margin-bottom: 8px;
+}
+
+.gweather-dropdown-menu {
+    background-color: rgba(20, 20, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    padding: 6px;
+    min-width: 230px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.gweather-dropdown-item {
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin: 1px 0;
+    border: 1px solid transparent;
+}
+
+.gweather-dropdown-item:hover,
+.gweather-dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.gweather-dropdown-item.active {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.gweather-dropdown-item.active:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+.gweather-dropdown-item-box {
+    spacing: 8px;
+}
+
+.gweather-dropdown-item-check {
+    color: #64b5f6;
+    margin-right: 6px;
+}
+
+.gweather-dropdown-item-name {
+    font-size: 0.95em;
     color: rgba(255, 255, 255, 0.9);
+}
+
+.gweather-dropdown-item.active .gweather-dropdown-item-name {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.gweather-dropdown-badge {
+    font-size: 0.78em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.gweather-dropdown-badge.free {
+    color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.gweather-dropdown-badge.configured {
+    color: #81c784;
+    background-color: rgba(129, 199, 132, 0.15);
+}
+
+.gweather-dropdown-badge.missing {
+    color: #ffb74d;
+    background-color: rgba(255, 183, 77, 0.15);
 }
 
 .gweather-settings-button {
